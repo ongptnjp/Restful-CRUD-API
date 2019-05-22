@@ -1,4 +1,5 @@
 const Note = require('../models/note.model.js')
+const mongoOp = require('../models/note.model')
 
 // Create and save a new Note
 exports.create = (req, res) => {
@@ -29,8 +30,49 @@ exports.create = (req, res) => {
 
 // Retrieve and return all notes from the database.
 exports.findAll = (req, res) => {
-    Note.find().then(notes => {
-        res.send(notes)
+    var pageNo = parseInt(req.query.pageNo)
+    var size = parseInt(req.query.size)
+    var query = {}
+    if (pageNo < 0 || pageNo === 0) {
+        response = {
+            "error": true,
+            "message": 'invalid page number, should start with 1'
+        }
+        return res.json(response)
+    }
+    query.skip = size * (pageNo - 1)
+    query.limit = size
+
+    // count notes
+    mongoOp.count({}, function(err, totalCount) {
+        if (err) {
+            response = {
+                "error": true,
+                "message": "error fetching data"
+            }
+        }
+        
+        // find all notes
+        mongoOp.find({},{},query,function(err, data) {
+            if (err) {
+                response = {
+                    "error": true,
+                    "message": "error fetching data"
+                }
+            } else {
+                var totalPage = Math.ceil(totalCount / size)
+                response = {
+                    "error": false,
+                    "page": totalPage,
+                    "message": data
+                }
+            }
+            res.json(response)
+        }).catch(err => {
+            res.status(500).send({
+                message: err.message || 'Some error occurred while retrieving notes.'
+            })
+        })
     }).catch(err => {
         res.status(500).send({
             message: err.message || 'Some error occurred while retrieving notes.'
